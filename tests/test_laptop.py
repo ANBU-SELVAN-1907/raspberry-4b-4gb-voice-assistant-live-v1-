@@ -7,9 +7,41 @@ from unittest.mock import patch
 from jarvis.config import load_config
 from jarvis.oled import OledBridge, encode_snapshot, display_text
 from scripts.windows_audio import device_id
+from jarvis.metrics import memory_pressure
+from scripts.windows_memory import repair_config
 
 
 class LaptopTests(unittest.TestCase):
+    def test_laptop_memory_guard_checks_available_ram_and_recovers_with_margin(self):
+        cfg = load_config(Path("unused-config"), profile="laptop")
+        memory = {"used_bytes": 14200000000, "available_bytes": 2500000000}
+        self.assertIsNone(memory_pressure(memory, cfg))
+        low = {"used_bytes": 14200000000, "available_bytes": 1200000000}
+        self.assertIn("1.20 GB available", memory_pressure(low, cfg))
+        edge = {"used_bytes": 14200000000, "available_bytes": 1600000000}
+        self.assertIsNone(memory_pressure(edge, cfg))
+        self.assertIsNotNone(memory_pressure(edge, cfg, recovering=True))
+        self.assertIsNone(memory_pressure(memory, cfg, recovering=True))
+
+    def test_pi_memory_guard_preserves_strict_system_budget(self):
+        cfg = load_config(Path("unused-config"), profile="pi")
+        self.assertIsNone(memory_pressure({"used_bytes": 3199999999}, cfg))
+        self.assertIsNotNone(memory_pressure({"used_bytes": 3200000000}, cfg))
+
+    def test_memory_repair_preserves_audio_and_backs_up_original(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "config.laptop.json"
+            original = '{"system_ram_limit_bytes":3200000000,"input_device":"USB Headset"}'
+            path.write_text(original, encoding="utf-8-sig")
+            repair_config(path)
+            cfg = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(cfg["input_device"], "USB Headset")
+            self.assertEqual(cfg["system_ram_limit_bytes"], 16000000000)
+            backup = path.with_name(path.name + ".before-memory-repair")
+            self.assertEqual(backup.read_text(encoding="utf-8-sig"), original)
+            repair_config(path)
+            self.assertEqual(backup.read_text(encoding="utf-8-sig"), original)
+
     def test_laptop_profile_accepts_laptop_threads_and_context(self):
         with tempfile.TemporaryDirectory() as folder:
             cfg = load_config(Path(folder) / "missing", profile="laptop")

@@ -10,13 +10,13 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from jarvis.config import load_config
 from jarvis.engine import Engine
-from jarvis.metrics import system_memory, temperature
+from jarvis.metrics import memory_pressure, system_memory, temperature
 
 
 async def benchmark():
     import aiohttp
     cfg = load_config()
-    report = {"hardware": "Run this report on the actual Pi 4", "model": cfg["llm_model"], "threads": cfg["threads"], "context": cfg["context"], "temperature_c_start": temperature()}
+    report = {"hardware": "Measured on the computer running this command", "model": cfg["llm_model"], "threads": cfg["threads"], "context": cfg["context"], "temperature_c_start": temperature()}
     async with aiohttp.ClientSession(trust_env=False) as http:
         engine = Engine(cfg, http)
         maximum_used = 0
@@ -26,9 +26,9 @@ async def benchmark():
                 memory = system_memory()
                 if memory:
                     maximum_used = max(maximum_used, memory["used_bytes"])
-                    if memory["used_bytes"] > cfg["system_ram_limit_bytes"]:
+                    if reason := memory_pressure(memory, cfg):
                         await engine.stop()
-                        raise RuntimeError("RAM ceiling exceeded during benchmark")
+                        raise RuntimeError(reason)
                 await asyncio.sleep(0.1)
         try:
             async with asyncio.TaskGroup() as group:

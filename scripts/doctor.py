@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from jarvis.config import load_config, resolve
-from jarvis.metrics import system_memory
+from jarvis.metrics import memory_pressure, system_memory
 
 
 def digest(path):
@@ -63,8 +63,9 @@ def main():
 
 
 def memory_check(memory, cfg):
-    if memory["used_bytes"] >= cfg["system_ram_limit_bytes"] or memory["available_bytes"] < 1800000000:
-        raise ValueError("Close other applications; at least 1.8 GB available is recommended")
+    reason = memory_pressure(memory, cfg)
+    if reason:
+        raise ValueError(reason)
     return f"{memory['used_bytes']/1e9:.2f} GB used; {memory['available_bytes']/1e9:.2f} GB available"
 
 

@@ -2,6 +2,27 @@ from pathlib import Path
 import os
 
 
+def memory_pressure(memory, cfg, *, recovering=False):
+    """Return an actionable reason, retaining the Pi's absolute system budget."""
+    if not memory:
+        return None
+    margin = 256000000 if recovering else 0
+    limit = cfg["system_ram_limit_bytes"]
+    reserve = cfg.get("minimum_available_memory_bytes", 0)
+    used = memory["used_bytes"]
+    available = memory.get("available_bytes")
+    over_budget = used >= limit - margin
+    low_headroom = reserve > 0 and available is not None and available < reserve + margin
+    if not over_budget and not low_headroom:
+        return None
+    readings = f"{used / 1e9:.2f} GB used"
+    if available is not None:
+        readings += f", {available / 1e9:.2f} GB available"
+    return (f"Memory pressure ({readings}; use limit {limit / 1e9:.2f} GB, "
+            f"free reserve {reserve / 1e9:.2f} GB). Close other apps. "
+            "On Windows, run repair_memory.bat if the settings came from another computer.")
+
+
 def system_memory():
     if os.name == "nt":
         import ctypes

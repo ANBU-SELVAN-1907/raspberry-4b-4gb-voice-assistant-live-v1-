@@ -15,6 +15,7 @@ def load_config(path=None, profile=None):
     defaults.setdefault("oled_port", "auto")
     defaults.setdefault("oled_baud", 115200)
     defaults.setdefault("retain_voice", False)
+    defaults.setdefault("minimum_available_memory_bytes", 1500000000 if profile == "laptop" else 0)
     path = Path(path or ROOT / ("config.laptop.json" if profile == "laptop" else "config.json"))
     if path.exists():
         custom = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -35,6 +36,8 @@ def load_config(path=None, profile=None):
         raise ValueError("idle_unload_seconds cannot be negative")
     if not 0 < defaults["system_ram_limit_bytes"] <= max_ram:
         raise ValueError(f"system RAM limit must be <= {max_ram} bytes for {profile}")
+    if not 0 <= defaults["minimum_available_memory_bytes"] <= max_ram:
+        raise ValueError(f"minimum available memory must be 0..{max_ram} bytes")
     if defaults["port"] == defaults["llama_port"]:
         raise ValueError("GUI and llama.cpp ports must differ")
     if not 0.1 <= defaults["kws_threshold"] <= 0.8 or not 0.5 <= defaults["kws_score"] <= 3:

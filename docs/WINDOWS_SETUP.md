@@ -40,5 +40,6 @@ Auto discovery probes known USB-serial IDs and confirms `JARVIS_OLED_READY v1`; 
 | OLED does not receive replies | Close Serial Monitor; check COM port/USB data cable; run test_oled.bat |
 | Upload stuck connecting | Hold BOOT until flashing begins; check selected COM port |
 | Friend is offline | Use the completed transfer bundle, not a source-only archive; USB driver must already be available |
+| Memory pressure / heavy workers stopped | Close Jarvis, run repair_memory.bat, restart. It reports actual used/free RAM, corrects laptop limits and preserves audio/OLED settings. If less than 1.5 GB remains free, close large apps. Updated Jarvis returns to idle automatically when headroom recovers. |
 
 Logs: run/llama.log, run/speech.log, run/tts.log; terminal logs show OLED connection. Say Exit for clean shutdown. Closing the console abruptly can bypass graceful cleanup; prefer the Exit button/command or Ctrl+C.

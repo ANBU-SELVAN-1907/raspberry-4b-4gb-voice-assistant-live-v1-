@@ -14,7 +14,7 @@ from aiohttp import web
 
 from .config import ROOT, load_config
 from .engine import Engine, terminate
-from .metrics import system_memory, temperature
+from .metrics import memory_pressure, system_memory, temperature
 from .skills import local_reply, timer_seconds
 from .speaker import Speaker
 from .store import Store
@@ -45,6 +45,7 @@ class Assistant:
         self.idle_since = time.monotonic()
         self.fatal = None
         self.audio_ready = cfg["mock"]
+        self.memory_blocked = False
 
     def publish(self, event):
         if event["type"] == "state":
@@ -134,9 +135,14 @@ class Assistant:
             if was_busy:
                 await self.engine.stop()
             memory = system_memory()
-            if memory and memory["used_bytes"] >= self.cfg["system_ram_limit_bytes"]:
-                self.transition("error", text="Memory budget exceeded. Close other programs.")
+            reason = memory_pressure(memory, self.cfg)
+            if reason:
+                await self.speaker.stop()
+                await self.engine.stop()
+                self.memory_blocked = True
+                self.transition("error", text=reason, expression="concerned")
                 return
+            self.memory_blocked = False
             self.session += 1
             self.transition("listening", expression="curious", text="", heard="", sources=[])
             await self.audio_command("listen")
@@ -210,10 +216,13 @@ class Assistant:
             self.publish({"type": "warning", "text": "The microphone is still starting. Please wait."})
             return
         memory = system_memory()
-        if memory and memory["used_bytes"] >= self.cfg["system_ram_limit_bytes"]:
+        reason = memory_pressure(memory, self.cfg)
+        if reason:
             await self.stop()
-            self.transition("error", text="Memory budget exceeded. Close other programs.")
+            self.memory_blocked = True
+            self.transition("error", text=reason, expression="concerned")
             return
+        self.memory_blocked = False
         async with self.lock:
             # Preserve a completed/in-progress preload until answer.ensure joins it.
             await self.audio_command("idle")
@@ -330,12 +339,19 @@ class Assistant:
             memory = system_memory()
             self.publish({"type": "system", "memory": memory, "temperature_c": temperature(),
                           "ram_limit_bytes": self.cfg["system_ram_limit_bytes"], "oled_connected": self.oled.connected})
-            if memory and memory["used_bytes"] >= self.cfg["system_ram_limit_bytes"]:
+            reason = memory_pressure(memory, self.cfg)
+            if reason:
                 if self.state["state"] not in {"error", "offline"}:
                     await self.stop()
-                    self.transition("error", text="System memory pressure: heavy workers stopped.", expression="concerned")
-            elif self.state["state"] in {"idle", "error"} and self.engine.process and time.monotonic() - self.idle_since >= self.cfg["idle_unload_seconds"]:
-                await self.engine.stop()
+                    self.memory_blocked = True
+                    self.transition("error", text="Heavy workers stopped. " + reason, expression="concerned")
+            else:
+                if self.memory_blocked and memory and not memory_pressure(memory, self.cfg, recovering=True):
+                    self.memory_blocked = False
+                    self.idle_since = time.monotonic()
+                    self.transition("idle", text="Memory is available again. Say Hey Jarvis.", expression="calm")
+                if self.state["state"] in {"idle", "error"} and self.engine.process and time.monotonic() - self.idle_since >= self.cfg["idle_unload_seconds"]:
+                    await self.engine.stop()
             if self.state["state"] in {"idle", "error"} and self.speaker.process and time.monotonic() - self.idle_since >= self.cfg["idle_unload_seconds"]:
                 await self.speaker.stop()
 

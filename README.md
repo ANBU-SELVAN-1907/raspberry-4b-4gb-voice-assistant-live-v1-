@@ -37,6 +37,7 @@ Then run **start.bat**. Answers appear both in the browser and on the OLED. Text
 | **flash_esp32.bat** | Flash the display firmware to the selected COM port |
 | **diagnostics.bat** | Check models, dependencies and checksums without network |
 | **test_oled.bat** | Send a long text sample to the flashed OLED without running AI |
+| **repair_memory.bat** | Show actual RAM and repair laptop memory settings; close Jarvis first |
 
 ## Speech and useful commands
 
@@ -68,7 +69,9 @@ The compact LLM is retained for fast conversation. A laptop can run larger GGUFs
 
 On Windows, `config.laptop.json` is separate from the legacy Pi settings. Set `idle_unload_seconds` to0 for minimum idle LLM residency or keep 300 for faster repeat conversations. Stop always terminates inference. You can adjust `threads` between 1 and 12, `context` up to 8192, and `max_tokens` up to 256. Longer replies increase time and OLED scrolling duration. Run benchmarks before asserting a particular latency.
 
-The former 3.2 GB Pi system budget is not applied to this 16 GB laptop profile. Windows memory telemetry and a 14 GB estimated-system-use guard are enabled by default. This is an application guard, not a Windows hard job-object memory limit. Keep other programs under control. No measured performance claim is made for your friend's laptop until it is tested there.
+The former 3.2 GB Pi system budget is not applied to this 16 GB laptop profile. The current Windows policy stops heavy workers when less than 1.5 GB physical RAM is available or estimated total system use reaches 16 GB. It reports the actual readings and returns to idle when headroom recovers, with a 256 MB recovery margin to avoid repeated stop/restart cycles. These decimal GB thresholds are application checks, not a Windows hard memory limit. An older config.laptop.json can retain its earlier threshold: close Jarvis, run **repair_memory.bat**, then start again. The tool preserves audio/OLED settings and backs up the original config. A 16 GB RAM label does not guarantee free RAM; close large apps if the reported available RAM is still low.
+
+The [complete project manual](docs/JARVIS_COMPLETE_PROJECT_GUIDE.md) explains every component, models, architecture, installation, ESP32 pinout, everyday commands, knowledge indexing, applications and maintenance.
 
 ## Transfer and privacy
 

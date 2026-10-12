@@ -4,7 +4,7 @@ Verified on 12 October 2026 with the project's **portable Python 3.13.16 x64 run
 
 | Check | Result |
 |---|---|
-| Python unit/integration suite |22 tests passed, including 20 turns, cancellation, memory guards, OLED framing, Unicode normalization, stable device names and continuous resampling |
+| Python unit/integration suite |27 tests passed, including 20 turns, cancellation, memory guard/recovery, laptop config repair, OLED framing, Unicode normalization, stable device names and continuous resampling |
 | Real offline speech-model smoke | Hey Jarvis / Okay stop / Exit detected; France question transcribed |
 | Real llama.cpp/LFM2.5 model | “The capital of France is Paris.” |
 | Real Piper subprocess |16kHz PCM generated and streamed |
@@ -23,3 +23,5 @@ A real Windows startup test exposed a native library load-order hang: NumPy is n
 The firmware uses a pinned classic-ESP32 Arduino 2.0.17 core and current downloaded OLED/JSON libraries. The local SDK extractor skips other chip families to reduce disk use; official archive checksums remain verified. Windows short-path compiler overrides avoid exceeding GCC's command-line length limit in long paths. The prepared bundle contains the compiled image and native flasher, so the receiving laptop does not need the SDK or compiler.
 
 Check the physical hardware using test_oled.bat and the ESP32 wiring guide. A successful build proves source compatibility, not your panel's address, wiring or visible scroll smoothness. Close Jarvis before flashing or testing OLED serial access. The USB bridge driver must be available on the receiving Windows machine.
+
+The memory-pressure update adds a 1.5 GB available-physical-RAM reserve and a 16 GB system-use threshold for the laptop profile. The original Pi limit remains 3.2 GB. Tests verify laptop headroom, recovery hysteresis, automatic return to idle, preservation of unrelated errors and backup/preservation of audio configuration. The receiving laptop's reported “12/16” reading alone does not establish why its old guard fired; repair_memory.bat prints the actual readings and updates local settings.

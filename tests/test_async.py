@@ -108,6 +108,24 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.assistant.state["state"], "error")
         self.assertIsNone(self.assistant.turn)
 
+    async def test_memory_pressure_recovers_to_idle_when_headroom_returns(self):
+        from unittest.mock import patch
+        self.assistant.memory_blocked = True
+        self.assistant.transition("error", text="Heavy workers stopped")
+        with patch("jarvis.app.system_memory", return_value={"used_bytes": 2000000000}):
+            async with asyncio.timeout(3):
+                while self.assistant.state["state"] != "idle":
+                    await asyncio.sleep(0.05)
+        self.assertFalse(self.assistant.memory_blocked)
+        self.assertIn("Memory is available again", self.assistant.state["text"])
+
+    async def test_memory_recovery_does_not_clear_unrelated_errors(self):
+        from unittest.mock import patch
+        self.assistant.transition("error", text="Reply failed")
+        with patch("jarvis.app.system_memory", return_value={"used_bytes": 2000000000}):
+            await asyncio.sleep(1.1)
+        self.assertEqual(self.assistant.state["state"], "error")
+
     async def test_speaking_state_preserves_streamed_reply_for_reconnect(self):
         self.assistant.publish({"type": "reply", "text": "Hello friend."})
         self.assistant.transition("speaking")

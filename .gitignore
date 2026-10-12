@@ -13,3 +13,4 @@ dist/
 runtime/
 esp32/build/
 config.laptop.json
+config.laptop.json.before-memory-repair
