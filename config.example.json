@@ -1,0 +1,22 @@
+{
+  "host": "127.0.0.1",
+  "port": 8765,
+  "llama_port": 8766,
+  "llm_model": "models/llm/assistant.gguf",
+  "llama_binary": "vendor/llama.cpp/build/bin/llama-server",
+  "voice_model": "models/tts/en_US-lessac-low.onnx",
+  "input_device": "default",
+  "output_device": "default",
+  "input_rate": 48000,
+  "threads": 3,
+  "context": 2048,
+  "max_tokens": 96,
+  "idle_unload_seconds": 0,
+  "listen_timeout_seconds": 12,
+  "utterance_limit_seconds": 20,
+  "endpoint_silence_seconds": 0.55,
+  "kws_score": 2.0,
+  "kws_threshold": 0.2,
+  "system_ram_limit_bytes": 3200000000,
+  "mock": false
+}

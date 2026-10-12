@@ -1,0 +1,12 @@
+.venv/
+models/
+vendor/
+data/
+run/
+config.json
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+.env
+dist/

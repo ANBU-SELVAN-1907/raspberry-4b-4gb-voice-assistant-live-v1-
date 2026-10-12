@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark"><title>Jarvis · Offline companion</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%230a1525'/%3E%3Cpath d='M16 25h8m16 0h8M22 41q10 10 20 0' stroke='%235ce1cd' stroke-width='5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css"><script defer src="/static/app.js"></script>
+</head>
+<body>
+<main>
+  <header><a class="brand" href="/" aria-label="Jarvis home"><span class="brand-icon">J</span> JARVIS<span class="small">LOCAL INTELLIGENCE</span></a><span id="connection" class="badge">CONNECTING</span><button id="fullscreen" class="quiet" title="Full screen">↗ Full screen</button></header>
+  <section class="stage" aria-label="Animated companion">
+    <div class="ambient"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+    <div class="eyebrow">A LITTLE COMPANY. A LOT OF CURIOSITY.</div>
+    <svg id="face" viewBox="0 0 800 500" role="img" aria-label="Jarvis animated face">
+      <defs><radialGradient id="shell"><stop stop-color="#183142"/><stop offset="1" stop-color="#091420"/></radialGradient><linearGradient id="edge" x2="0" y2="1"><stop stop-color="#76eed7" stop-opacity=".7"/><stop offset="1" stop-color="#36677c" stop-opacity=".2"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="3"/></filter></defs>
+      <ellipse cx="400" cy="455" rx="185" ry="13" fill="#55dbc5" opacity=".07"/>
+      <g id="head"><rect x="153" y="74" width="494" height="339" rx="133" fill="url(#shell)" stroke="url(#edge)" stroke-width="2"/>
+        <path d="M216 104Q400 58 584 104" stroke="#9bffe8" stroke-opacity=".08" stroke-width="3" fill="none"/>
+        <g id="brows" stroke="var(--face-color)" stroke-width="6" stroke-linecap="round" opacity=".5"><path id="brow-left" d="M247 164Q282 152 315 164"/><path id="brow-right" d="M485 164Q518 152 553 164"/></g>
+        <g id="eyes" fill="var(--face-color)"><rect id="eye-left" x="252" y="203" width="61" height="67" rx="27"/><rect id="eye-right" x="487" y="203" width="61" height="67" rx="27"/></g>
+        <g opacity=".18" fill="var(--face-color)"><ellipse cx="227" cy="300" rx="25" ry="8"/><ellipse cx="573" cy="300" rx="25" ry="8"/></g>
+        <path id="mouth" d="M346 330Q400 363 454 330" stroke="var(--face-color)" stroke-width="8" stroke-linecap="round" fill="none"/>
+        <circle cx="400" cy="108" r="4" fill="var(--face-color)" opacity=".6"/>
+      </g>
+    </svg>
+    <div class="presence"><span id="state-dot"></span><span id="state">Connecting</span><span class="slash">/</span><span id="emotion">calm</span></div>
+    <h1 id="headline">Hello. I'm Jarvis.</h1><p id="hint">Your private, offline companion.</p>
+    <div class="wave" id="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </section>
+  <section class="conversation" aria-label="Conversation">
+    <div class="line-label">YOU <span id="heard">Say “Hey Jarvis”, pause briefly, then ask.</span></div>
+    <p id="reply" aria-live="polite">I'm ready when you are.</p>
+    <div id="sources"></div><div id="notice" role="status"></div>
+    <form id="ask"><label class="sr-only" for="question">Type a question</label><input id="question" maxlength="600" autocomplete="off" placeholder="Or type something here…"><button type="submit" id="send">Send ↗</button></form>
+    <div class="actions"><button id="wake" class="primary">◉ Wake Jarvis</button><button id="stop">■ Stop</button><button id="exit" class="quiet">Exit assistant</button><span class="key-hint">Space to wake · Esc to stop</span></div>
+  </section>
+  <footer><span>ON YOUR PI. IN YOUR COMPANY.</span><div><span id="latency">Latency —</span><span id="memory">Pi memory —</span><span id="temperature">Temperature —</span></div></footer>
+  <details class="expression-preview"><summary>Face studio</summary><p>Preview expressions locally on your laptop.</p><div id="expressions"></div><button id="live-face">Return to live face</button></details>
+</main>
+</body></html>
