@@ -4,3 +4,6 @@
 *.js text eol=lf
 *.css text eol=lf
 *.html text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.ino text eol=lf

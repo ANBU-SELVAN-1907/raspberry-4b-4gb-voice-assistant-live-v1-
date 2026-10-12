@@ -3,9 +3,12 @@ import base64
 import json
 import math
 import sys
+import os
+import subprocess
 
 from .config import ROOT
 from .engine import terminate
+from .resample import LinearResampler
 
 
 class Speaker:
@@ -15,14 +18,21 @@ class Speaker:
         self.output = None
         self.log = None
         self.rate = None
+        self.resampler = None
+        self.load_lock = asyncio.Lock()
 
     async def start(self):
+        async with self.load_lock:
+            await self._start()
+
+    async def _start(self):
         if self.process and self.process.returncode is None:
             return
         self.log = (ROOT / "run/tts.log").open("wb")
         self.process = await asyncio.create_subprocess_exec(
             sys.executable, "-m", "jarvis.tts_worker", cwd=ROOT,
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=self.log)
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=self.log,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         line = await asyncio.wait_for(self.process.stdout.readline(), 30)
         if not line or not json.loads(line).get("ready"):
             raise RuntimeError("Piper failed to start. Inspect run/tts.log")
@@ -46,7 +56,13 @@ class Speaker:
                 if self.output:
                     self.output.close()
                 self.rate = event["rate"]
-                self.output = sd.RawOutputStream(samplerate=self.rate, channels=1, dtype="int16",
+                output_rate = self.rate
+                try:
+                    sd.check_output_settings(device=self.config["output_device"], channels=1, dtype="int16", samplerate=output_rate)
+                except sd.PortAudioError:
+                    output_rate = int(sd.query_devices(self.config["output_device"], "output")["default_samplerate"])
+                self.resampler = LinearResampler(self.rate, output_rate) if self.rate != output_rate else None
+                self.output = sd.RawOutputStream(samplerate=output_rate, channels=1, dtype="int16",
                                                  device=self.config["output_device"], latency="low")
                 self.output.start()
             samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768
@@ -55,8 +71,11 @@ class Speaker:
             if not played and first_audio:
                 first_audio()
             played = True
+            if self.resampler:
+                pcm = self.resampler.convert(pcm)
             # Only ~46-64ms per write; cancellation aborts PortAudio immediately.
-            await asyncio.to_thread(self.output.write, pcm)
+            if pcm:
+                await asyncio.to_thread(self.output.write, pcm)
 
     async def stop(self):
         if self.output:
@@ -73,3 +92,5 @@ class Speaker:
     async def finish(self):
         if self.output:
             await asyncio.to_thread(self.output.stop)
+            self.output.close()
+            self.output = None

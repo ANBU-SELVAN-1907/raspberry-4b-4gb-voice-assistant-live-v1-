@@ -2,6 +2,8 @@ import asyncio
 import contextlib
 import json
 import time
+import os
+import subprocess
 
 import aiohttp
 
@@ -55,7 +57,8 @@ class Engine:
                     "-c", str(cfg["context"]), "-b", "128", "-ub", "64",
                     "-ngl", "0", "--parallel", "1", "--jinja", "--no-warmup"]
             try:
-                self.process = await asyncio.create_subprocess_exec(*args, stdout=self.log, stderr=self.log, cwd=ROOT)
+                self.process = await asyncio.create_subprocess_exec(*args, stdout=self.log, stderr=self.log, cwd=ROOT,
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
                 deadline = time.monotonic() + 90
                 while time.monotonic() < deadline:
                     if self.process.returncode is not None:

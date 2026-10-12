@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 import sys
+import subprocess
 import time
 
 import aiohttp
@@ -18,6 +19,7 @@ from .skills import local_reply, timer_seconds
 from .speaker import Speaker
 from .store import Store
 from .text import SpeechChunks, control, expression
+from .oled import OledBridge
 
 LOG = logging.getLogger("jarvis")
 
@@ -25,6 +27,7 @@ LOG = logging.getLogger("jarvis")
 class Assistant:
     def __init__(self, cfg, http, store=None):
         self.cfg = cfg
+        self.oled = OledBridge(cfg)
         self.engine = Engine(cfg, http)
         self.speaker = Speaker(cfg, self.publish)
         self.store = store or Store(ROOT / "data/memory.sqlite3")
@@ -33,6 +36,7 @@ class Assistant:
         self.state = {"type": "state", "state": "booting", "expression": "neutral",
                       "text": "", "heard": "", "sources": [], "metrics": {}, "mock": cfg["mock"]}
         self.turn = self.warm = self.speech = self.reader = self.monitor = None
+        self.voice_warm = None
         self.speech_log = None
         self.timers = set()
         self.lock = asyncio.Lock()
@@ -50,6 +54,11 @@ class Assistant:
             self.state["text"] = event["text"]
         elif event["type"] == "metrics":
             self.state["metrics"] = {k: v for k, v in event.items() if k != "type"}
+        if event["type"] in {"state", "reply"}:
+            oled_text = self.state["text"]
+            if self.state["state"] == "listening":
+                oled_text = self.state["heard"] or "Listening..."
+            self.oled.update(self.state["state"], oled_text)
         for client in list(self.clients):
             if client.full():
                 # Slow browsers cannot hold back audio or inference.
@@ -66,13 +75,15 @@ class Assistant:
 
     async def start(self):
         (ROOT / "run").mkdir(exist_ok=True)
+        self.oled.start()
         if self.cfg["mock"]:
             self.transition("idle", text="Demo mode. Hardware and models are disabled.")
         else:
             self.speech_log = (ROOT / "run/speech.log").open("wb")
             self.speech = await asyncio.create_subprocess_exec(
                 sys.executable, "-m", "jarvis.speech_worker", cwd=ROOT,
-                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=self.speech_log)
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=self.speech_log,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
             self.reader = asyncio.create_task(self.read_audio())
         self.monitor = asyncio.create_task(self.maintenance())
 
@@ -119,18 +130,29 @@ class Assistant:
             return
         async with self.lock:
             was_busy = self.turn is not None and not self.turn.done()
-            await self._cancel()
+            await self._cancel(stop_speaker=was_busy)
             if was_busy:
                 await self.engine.stop()
             memory = system_memory()
             if memory and memory["used_bytes"] >= self.cfg["system_ram_limit_bytes"]:
-                self.transition("error", text="Memory budget exceeded. Close other programs on the Pi.")
+                self.transition("error", text="Memory budget exceeded. Close other programs.")
                 return
             self.session += 1
             self.transition("listening", expression="curious", text="", heard="", sources=[])
             await self.audio_command("listen")
             if not self.cfg["mock"]:
                 self.warm = asyncio.create_task(self._preload())
+                if self.cfg["retain_voice"]:
+                    self.voice_warm = asyncio.create_task(self._preload_voice())
+
+    async def _preload_voice(self):
+        try:
+            await self.speaker.start()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            LOG.exception("Voice preload failed; the answer path will report the error")
+            await self.speaker.stop()
 
     async def _preload(self):
         try:
@@ -140,16 +162,19 @@ class Assistant:
         except Exception:
             LOG.exception("LLM preload failed; the answer path will report the error")
 
-    async def _cancel(self):
+    async def _cancel(self, stop_speaker=True):
         self.session += 1
         await self.audio_command("idle")
-        for task in (self.turn, self.warm):
+        loading_voice = self.voice_warm and not self.voice_warm.done()
+        for task in (self.turn, self.warm, self.voice_warm):
             if task and not task.done():
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
         self.turn = self.warm = None
-        await self.speaker.stop()
+        self.voice_warm = None
+        if stop_speaker or loading_voice:
+            await self.speaker.stop()
 
     async def stop(self):
         started = time.monotonic()
@@ -187,7 +212,7 @@ class Assistant:
         memory = system_memory()
         if memory and memory["used_bytes"] >= self.cfg["system_ram_limit_bytes"]:
             await self.stop()
-            self.transition("error", text="Memory budget exceeded. Close other programs on the Pi.")
+            self.transition("error", text="Memory budget exceeded. Close other programs.")
             return
         async with self.lock:
             # Preserve a completed/in-progress preload until answer.ensure joins it.
@@ -242,7 +267,7 @@ class Assistant:
                     yield direct
             elif self.cfg["mock"]:
                 async def tokens():
-                    for word in "I'm your offline companion. This demo shows the interface without loading Pi models.".split():
+                    for word in "I'm your offline companion. This demo shows the interface without loading AI models.".split():
                         await asyncio.sleep(0.015)
                         yield word + " "
             else:
@@ -267,7 +292,7 @@ class Assistant:
                 group.create_task(generate())
                 group.create_task(speak())
             await self.speaker.finish()
-            reply = "".join(full).strip()[:1200]
+            reply = "".join(full).strip()[:2400]
             self.history.extend([{"role": "user", "content": text[:400]}, {"role": "assistant", "content": reply[:400]}])
             self.history = self.history[-4:]
             metrics["turn_ms"] = round((time.monotonic() - started) * 1000)
@@ -280,7 +305,8 @@ class Assistant:
             await self.engine.stop()
             self.transition("error", text=f"Reply failed: {exc}. Check run logs.", expression="concerned")
         finally:
-            await self.speaker.stop()
+            if not self.cfg["retain_voice"] or self.state["state"] == "error":
+                await self.speaker.stop()
             self.idle_since = time.monotonic()
             if self.cfg["idle_unload_seconds"] == 0:
                 await self.engine.stop()
@@ -302,13 +328,16 @@ class Assistant:
                 self.exiting.set()
                 return
             memory = system_memory()
-            self.publish({"type": "system", "memory": memory, "temperature_c": temperature()})
+            self.publish({"type": "system", "memory": memory, "temperature_c": temperature(),
+                          "ram_limit_bytes": self.cfg["system_ram_limit_bytes"], "oled_connected": self.oled.connected})
             if memory and memory["used_bytes"] >= self.cfg["system_ram_limit_bytes"]:
                 if self.state["state"] not in {"error", "offline"}:
                     await self.stop()
-                    self.transition("error", text="Pi memory pressure: heavy workers stopped.", expression="concerned")
+                    self.transition("error", text="System memory pressure: heavy workers stopped.", expression="concerned")
             elif self.state["state"] in {"idle", "error"} and self.engine.process and time.monotonic() - self.idle_since >= self.cfg["idle_unload_seconds"]:
                 await self.engine.stop()
+            if self.state["state"] in {"idle", "error"} and self.speaker.process and time.monotonic() - self.idle_since >= self.cfg["idle_unload_seconds"]:
+                await self.speaker.stop()
 
     async def close(self):
         self.exiting.set()
@@ -329,6 +358,9 @@ class Assistant:
         if self.speech_log:
             self.speech_log.close()
         self.store.close()
+        self.transition("offline", text="Jarvis is offline. Run start.bat when ready.", expression="calm")
+        await asyncio.sleep(0.25)
+        await asyncio.to_thread(self.oled.close)
 
 
 def make_web(assistant):
@@ -414,6 +446,9 @@ def main():
     parser.add_argument("--mock", action="store_true", help="GUI demo without models or audio")
     args = parser.parse_args()
     cfg = load_config()
+    if os.name == "nt" and not args.mock:
+        from scripts.windows_audio import resolve_devices
+        cfg = resolve_devices(cfg)
     cfg["mock"] = cfg["mock"] or args.mock
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     try:

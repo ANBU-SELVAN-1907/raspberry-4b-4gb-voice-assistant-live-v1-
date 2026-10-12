@@ -45,19 +45,21 @@ def main():
         check(name, lambda name=name: importlib.import_module(name).__name__)
     memory = system_memory()
     if memory:
-        check("Pi memory headroom", lambda: memory_check(memory, cfg))
+        check("System memory headroom", lambda: memory_check(memory, cfg))
     if args.models:
         check("Model manifest", lambda: check_manifest())
         check("llama.cpp binary", lambda: binary_check(cfg))
         check("Speech model smoke test", lambda: speech_smoke(cfg))
     if args.verify_hashes:
         check("Model checksums", verify_hashes)
+        if (ROOT / "runtime/runtime-checksums.json").exists():
+            check("Portable runtime checksums", verify_runtime)
     if args.audio:
         check("Headset capture and playback", lambda: audio_check(cfg))
     if failures:
         print("Fix failures before starting the service: " + ", ".join(failures))
         raise SystemExit(1)
-    print("Checks passed. Run audio_test.sh and benchmark.py on your Pi to validate audible output and latency.")
+    print("Checks passed. Test real microphone/playback and run benchmark.py on the target computer to validate latency.")
 
 
 def memory_check(memory, cfg):
@@ -116,8 +118,12 @@ def speech_smoke(cfg):
 
 def audio_check(cfg):
     import sounddevice as sd
+    if sys.platform == "win32":
+        from scripts.windows_audio import resolve_devices
+        cfg = resolve_devices(cfg)
     sd.check_input_settings(device=cfg["input_device"], channels=1, dtype="float32", samplerate=cfg["input_rate"])
-    sd.check_output_settings(device=cfg["output_device"], channels=1, dtype="int16", samplerate=16000)
+    rate = sd.query_devices(cfg["output_device"], "output")["default_samplerate"]
+    sd.check_output_settings(device=cfg["output_device"], channels=1, dtype="int16", samplerate=rate)
     with sd.InputStream(device=cfg["input_device"], samplerate=cfg["input_rate"], channels=1) as microphone:
         microphone.read(int(cfg["input_rate"] * 0.1))
     return "Input opened; Piper-rate output format supported"
@@ -129,6 +135,14 @@ def verify_hashes():
         if digest(resolve(path)) != expected:
             raise ValueError(f"Checksum mismatch: {path}; rerun download_models.py")
     return f"{len(hashes)} assets verified"
+
+
+def verify_runtime():
+    hashes = json.loads((ROOT / "runtime/runtime-checksums.json").read_text(encoding="utf-8"))
+    for path, expected in hashes.items():
+        if digest(resolve(path)) != expected:
+            raise ValueError(f"Runtime binary checksum mismatch: {path}")
+    return f"{len(hashes)} runtime binaries verified"
 
 
 if __name__ == "__main__":

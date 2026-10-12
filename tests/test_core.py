@@ -57,7 +57,7 @@ class CoreTests(unittest.TestCase):
             for custom in ({"context": 8192}, {"threads": 4}, {"host": "0.0.0.0"}, {"system_ram_limit_bytes": 4000000000}):
                 path.write_text(json.dumps(custom))
                 with self.assertRaises(ValueError):
-                    load_config(path)
+                    load_config(path, profile="pi")
 
     def test_audio_card_selection_handles_number_changes_and_ambiguity(self):
         spec = importlib.util.spec_from_file_location("audio_setup", Path(__file__).resolve().parent.parent / "scripts/configure_audio.py")

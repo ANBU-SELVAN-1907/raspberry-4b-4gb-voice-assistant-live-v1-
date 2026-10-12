@@ -16,8 +16,11 @@ from jarvis.store import Store
 
 class AsyncTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        from unittest.mock import patch
+        self.memory_patch = patch("jarvis.app.system_memory", return_value={})
+        self.memory_patch.start()
         self.tmp = tempfile.TemporaryDirectory()
-        self.cfg = load_config(Path(self.tmp.name) / "absent.json")
+        self.cfg = load_config(Path(self.tmp.name) / "absent.json", profile="pi")
         self.cfg["mock"] = True
         self.http = aiohttp.ClientSession()
         self.assistant = Assistant(self.cfg, self.http, Store(Path(self.tmp.name) / "test.db"))
@@ -27,6 +30,7 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
         await self.assistant.close()
         await self.http.close()
         self.tmp.cleanup()
+        self.memory_patch.stop()
 
     async def test_interrupt_cancels_generation_and_returns_idle(self):
         await self.assistant.submit("Tell me a story")

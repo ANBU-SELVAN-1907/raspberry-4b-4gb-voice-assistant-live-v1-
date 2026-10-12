@@ -4,13 +4,13 @@ const palettes = {neutral:'#7ae8cf',happy:'#8ff0ba',curious:'#8cc5ff',sad:'#91ac
 let ws, state='offline', mood='calm', preview=null, mouthTarget=0, mouth=0, blink=1, nextBlink=0, last=0, lastFrame=0, retry=500, userExit=false, noticeTimer;
 let serverState={};
 function notice(text){$('notice').textContent=text;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>{$('notice').textContent='';},8000);}
-function send(action, extra={}){if(ws?.readyState===WebSocket.OPEN) ws.send(JSON.stringify({action,...extra}));else notice('Connect the SSH tunnel to your Pi first.');}
+function send(action, extra={}){if(ws?.readyState===WebSocket.OPEN) ws.send(JSON.stringify({action,...extra}));else notice('Run start.bat and wait for Jarvis to connect.');}
 function controls(connected){for(const id of ['wake','stop','exit','send'])$(id).disabled=!connected;}
 function apply(event){
   if(event.type==='state'){
     serverState=event;state=event.state;mood=event.expression||'neutral';
     $('state').textContent=state;$('emotion').textContent=preview||mood;
-    const copy={booting:['Waking the senses.','Preparing local speech recognition.'],idle:["Hello. I'm Jarvis.",'Say “Hey Jarvis” whenever you need me.'],listening:["I'm listening.",'Ask me something.'],thinking:['Let me think.','A small brain, a curious mind.'],speaking:['Here with you.','Short answers. A little warmth.'],error:['A little help needed.','Check the message below.'],offline:['See you soon.','Restart the assistant on your Pi when ready.']};
+    const copy={booting:['Waking the senses.','Preparing local speech recognition.'],idle:["Hello. I'm Jarvis.",'Say “Hey Jarvis” whenever you need me.'],listening:["I'm listening.",'Ask me something.'],thinking:['Let me think.','A small brain, a curious mind.'],speaking:['Here with you.','Short answers. A little warmth.'],error:['A little help needed.','Check the message below.'],offline:['See you soon.','Run start.bat when you are ready.']};
     const [title,hint]=copy[state]||copy.idle;$('headline').textContent=title;$('hint').textContent=hint;
     $('heard').textContent=event.heard||'Say “Hey Jarvis”, pause briefly, then ask.';
     $('reply').textContent=event.text|| (state==='thinking'?'Thinking…':state==='listening'?'Go ahead.':"I'm ready when you are.");
@@ -24,8 +24,8 @@ function apply(event){
   else if(event.type==='warning'||event.type==='timer') notice(event.text);
   else if(event.type==='metrics'&&event.first_audio_ms!==undefined)$('latency').textContent='First audio '+(event.first_audio_ms/1000).toFixed(2)+'s';
   else if(event.type==='system'){
-    if(event.memory?.used_bytes)$('memory').textContent='Pi used '+(event.memory.used_bytes/1e9).toFixed(2)+' / 3.20 GB';
-    if(event.temperature_c!==null)$('temperature').textContent=event.temperature_c.toFixed(0)+'°C';
+    if(event.memory?.used_bytes)$('memory').textContent='System used '+(event.memory.used_bytes/1e9).toFixed(2)+' GB';
+    $('temperature').textContent='OLED '+(event.oled_connected?'connected':'not connected');
   }
 }
 function connect(){

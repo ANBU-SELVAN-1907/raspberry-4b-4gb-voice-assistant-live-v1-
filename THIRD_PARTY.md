@@ -11,3 +11,5 @@ The repository's original code is MIT licensed. Model assets and dependencies ar
 | llama.cpp | [MIT code](https://github.com/ggml-org/llama.cpp/blob/master/LICENSE) |
 
 Read upstream terms before redistribution or commercial deployment. Assets are pinned by source revision/checksum in `models.lock.json`; runtime installation records exact Python package versions. No proprietary character, external font, or remotely hosted animation asset is included.
+
+The Windows portable runtime also includes [Python (PSF license)](https://docs.python.org/3/license.html) and [pyserial (BSD)](https://github.com/pyserial/pyserial/blob/master/LICENSE.txt). ESP32 firmware uses [Espressif's Arduino core](https://github.com/espressif/arduino-esp32), [ArduinoJson (MIT)](https://arduinojson.org/v7/license/), and Adafruit SSD1306/GFX libraries under their upstream BSD licenses. The native [esptool flasher](https://github.com/espressif/esptool) retains its GPL license. Preserve downloaded runtime/library license files when redistributing the prepared bundle.
